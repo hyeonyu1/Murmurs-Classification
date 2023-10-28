@@ -1,0 +1,117 @@
+function [features] = get_features(sig,l)
+%GET_FEATURES Summary of this function goes here
+%   Detailed explanation goes here
+
+    fs = 4000;
+    n = length(sig);
+    t = linspace(0, n/fs, n);
+
+    % cropping the start and the end of the signal to remove noise 
+    starting = l.Var2(1);
+    ending = l.Var1(end);
+    
+    sig_idx = 1;
+    increment = t(1,2) - t(1,1);
+    cropped_t_val = starting;
+    
+    % cropping the signal to get rid of noise at the front and at the back
+    for i=1:size(sig)
+        if t(1,i) >= starting && t(1,i) <= ending
+            cropped_sig(sig_idx) = sig(i);
+            cropped_t(sig_idx) = cropped_t_val;
+            cropped_t_val = cropped_t_val+increment;
+            sig_idx = sig_idx + 1;
+        end
+    end
+
+    %butterworth filter design and application
+    d = designfilt('bandpassiir','FilterOrder',2, ...
+        'HalfPowerFrequency1',25,'HalfPowerFrequency2',400, ...
+        'SampleRate',fs);
+    
+    filtdata = filtfilt(d, cropped_sig);
+    
+    %log scale:
+    logdata = -1*((filtdata-mean(filtdata)).^2).*log((filtdata-mean(filtdata)).^2);
+    
+    
+    %low pass filter design and application
+    d2 = designfilt('lowpassiir','FilterOrder',2, ...
+        'PassBandFrequency',75, 'SampleRate',fs);
+    
+    filtlogdata = filtfilt(d2, logdata);
+        filt2data = sqrt(exp(filtlogdata));
+    
+    normenv = normalize(filt2data);
+
+    % getting the mean of the length of systolic, dystolic, s1 and s2
+    for i=1:size(l,1)
+        if l.Var3(i) == 1
+            s1_mean(i) = l.Var2(i)-l.Var1(i);
+        elseif l.Var3(i) == 2
+            s2_mean(i) = l.Var2(i)-l.Var1(i);
+        elseif l.Var3(i) == 3
+            s3_mean(i) = l.Var2(i)-l.Var1(i);
+        elseif l.Var3(i) == 4
+            s4_mean(i) = l.Var2(i)-l.Var1(i);
+        end         
+    end
+
+    s1_mean( :, ~any(s1_mean,1) ) = [];
+    s2_mean( :, ~any(s2_mean,1) ) = [];
+    s3_mean( :, ~any(s3_mean,1) ) = [];
+    s4_mean( :, ~any(s4_mean,1) ) = [];
+    s1_mean = mean(s1_mean);
+    s2_mean = mean(s2_mean);
+    s3_mean = mean(s3_mean);
+    s4_mean = mean(s4_mean);
+    
+    % getting stft 
+    stft_sig = stft(normenv,fs,'frequencyrange', 'onesided', 'Window',kaiser(256,5),'OverlapLength', 220);
+    full_stft = 0;
+    for i=1:size(stft_sig,1)
+      for j=1:size(stft_sig,2)
+        full_stft = full_stft+abs(stft_sig(i,j));
+      end
+    end
+    full_stft = fix(full_stft);
+
+
+    % features from the frequency domain
+    L = size(norm_filter_sig,1);                                              
+    Fn = Fs/2;
+    FT_af = fft(norm_filter_sig)/L;
+    Fv = linspace(0, 1, fix(L/2)+1)*Fn;
+    Iv = 1:numel(Fv);
+    [PksL,~] = findpeaks(abs(FT_af(Iv,1))*2, 'MinPeakHeight',0.1);
+    % max frequency peak
+    max_peak_f = max(PksL);
+
+    %Hear rate
+    HeartRate = ((numel(pks)/2)*60)/(modified_axis(1,end)-modified_axis(1,1));
+    
+    %Normalized frequency
+    [pxx,w] = pwelch(norm_filter_sig,'power');
+    dB = pow2db(pxx);
+    plot(w/pi,dB)
+    pwelch(norm_filter_sig, 'power')
+    high_pwelch = max(dB);
+
+
+    features = [
+                mean(normenv)
+                median(normenv)
+                mad(normenv)
+                skewness(normenv)
+                kurtosis(normenv)
+                iqr(normenv)
+                full_stft
+                s1_mean
+                s2_mean
+                s3_mean
+                s4_mean
+                ];
+
+
+end
+

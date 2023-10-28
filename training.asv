@@ -1,0 +1,47 @@
+% Folder
+close all; 
+clear; clc;
+% %%
+
+%This folder only has 40058_TV and 85033_TV in this example
+folder = 'data/normal/';
+[props_n,labels_n] = run_for_folder(folder,"Normal");
+
+
+
+% %This folder only has 61117_TV and 84802_PV in this example
+folder = 'data/murmur/';
+[props_m,labels_m] = run_for_folder(folder,"Murmur");
+% 
+props = [props_n;props_m];
+labels = [labels_n;labels_m];
+
+labels = cell2mat(labels);
+data = array2table([zeros(100,1),props]);
+data.Properties.VariableNames(1) = {'Label'};
+data.Label = labels;
+
+%%
+% %reading in ground truth HR-s (temp variable used to filter for these files)
+hr_normal = readtable("data/HR_normal.csv");
+hr_murmur = readtable("data/HR_murmur.csv");
+
+% temp = hr_normal.Signal=="40058_TV" | hr_normal.Signal=="85033_TV";
+% hr_n = table2array(hr_normal(temp,2));
+% temp = hr_murmur.Signal=="61117_TV" | hr_murmur.Signal=="84802_PV";
+% hr_m = table2array(hr_murmur(temp,2));
+% hrs = [hr_n;hr_m];
+% 
+% %setting ground truth array
+% pathology = [0,0,1,1];
+% 
+% %clearing variables
+% clear temp
+% clear props_true
+% 
+% %setting up the ground truth struct array
+% for k=1:length(hrs)
+%     temp.HR = hrs(k);
+%     temp.pathology = pathology(k);
+%     props_true(k) = temp;
+% end
